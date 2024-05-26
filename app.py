@@ -1,12 +1,14 @@
 import json
 import os
 import time
+import pandas as pd
 import requests
 from urllib.parse import quote
 from dotenv import load_dotenv
 import streamlit as st
 from streamlit_extras.metric_cards import style_metric_cards
 import pyperclip
+import altair as alt
 
 load_dotenv()
 
@@ -109,6 +111,21 @@ Model: {model}</p>"""
     )
     st.markdown(msg_extra, unsafe_allow_html=True)
 
+def get_data_sampler(imgs: list) -> pd.DataFrame:
+    '''get data sampler'''
+    sampler = []
+    count =  []
+    
+    for img in imgs['items']:
+        if meta:= img.get('meta'):
+            if sp:= meta.get('sampler'):
+                if sp not in sampler:
+                    sampler.append(sp)
+                    count.append(1)
+                else:
+                    count[sampler.index(sp)] += 1
+            
+    return pd.DataFrame({'sampler': sampler, 'count': count})
 
 ################
 # INIT SESSION #
@@ -219,7 +236,20 @@ if model_name:
                 if version['id'] not in model:
                     model[version['id']] = get_images(version_id=version['id'], model_id=model['id'])
                     st.session_state['models'][st.session_state['model_name']] = models
+                
+
                 with st.expander(f"{version['name']}", ):                
+                    data_sampler = get_data_sampler(model[version['id']])
+                    
+                    data = alt.Chart(data_sampler).mark_arc().encode(
+                        theta="count",              
+                        color="sampler",
+                        tooltip=["sampler", "count"],
+                    )
+                    st.altair_chart(
+                        data, 
+                        use_container_width=True
+                    )
                     st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {len(model[version['id']]['items'])}", unsafe_allow_html=True)
                     col_1, col_2, col_3, col_4 = st.columns(4)
                     i = 1
