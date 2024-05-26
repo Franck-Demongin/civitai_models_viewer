@@ -127,6 +127,32 @@ def get_data_sampler(imgs: list) -> pd.DataFrame:
             
     return pd.DataFrame({'sampler': sampler, 'count': count})
 
+def get_data_steps(imgs: list) -> pd.DataFrame:
+    '''get data steps'''
+    steps_by_sampler = {}    
+    for img in imgs['items']:
+        if meta:= img.get('meta'):
+            if sp:= meta.get('sampler') :
+                if stp:= meta.get('steps'):
+                    if sp not in steps_by_sampler:
+                        steps_by_sampler[sp] = []
+                    steps_by_sampler[sp].append(stp)
+            
+    return steps_by_sampler
+
+def get_data_CFG(imgs: list) -> pd.DataFrame:
+    '''get data CFG'''
+    CFG_by_sampler = {}    
+    for img in imgs['items']:
+        if meta:= img.get('meta'):
+            if sp:= meta.get('sampler') :
+                if stp:= meta.get('cfgScale'):
+                    if sp not in CFG_by_sampler:
+                        CFG_by_sampler[sp] = []
+                    CFG_by_sampler[sp].append(stp)
+            
+    return CFG_by_sampler
+
 ################
 # INIT SESSION #
 ################
@@ -239,8 +265,10 @@ if model_name:
                 
 
                 with st.expander(f"{version['name']}", ):                
+                    st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {len(model[version['id']]['items'])}", unsafe_allow_html=True)
+
+                    st.subheader("Stats", divider="blue")
                     data_sampler = get_data_sampler(model[version['id']])
-                    
                     data = alt.Chart(data_sampler).mark_arc().encode(
                         theta="count",              
                         color="sampler",
@@ -248,9 +276,81 @@ if model_name:
                     )
                     st.altair_chart(
                         data, 
-                        use_container_width=True
+                        use_container_width=False
                     )
-                    st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {len(model[version['id']]['items'])}", unsafe_allow_html=True)
+                    col_1, col_2 = st.columns(2)
+                    with col_1:
+                        data_steps = get_data_steps(model[version['id']])
+                        samplers = {
+                            'samplers': [],
+                            'group': [],
+                            'steps': [],
+                        }
+                        for sp in data_steps:
+                            samplers['samplers'].append(sp)
+                            samplers['samplers'].append(sp)
+                            samplers['samplers'].append(sp)
+                            samplers['group'].append('min')
+                            samplers['group'].append('mean')
+                            samplers['group'].append('max')
+                            samplers['steps'].append(pd.Series(data_steps[sp]).min())
+                            samplers['steps'].append(pd.Series(data_steps[sp]).mean())
+                            samplers['steps'].append(pd.Series(data_steps[sp]).max())
+                        
+                        samplers = pd.DataFrame(
+                            samplers,
+                            columns=['samplers', 'group', 'steps']                
+                        )
+
+                        data = alt.Chart(samplers).mark_bar().encode(
+                            x="samplers:N",
+                            y="steps:Q",
+                            xOffset="group:N",
+                            color='group:N',
+                        )
+                        st.altair_chart(
+                            data, 
+                            use_container_width=True,
+                            theme="streamlit"
+                        )
+                    with col_2:
+                        data_CFG = get_data_CFG(model[version['id']])
+                        samplers = {
+                            'samplers': [],
+                            'group': [],
+                            'CFG': [],
+                        }
+                        for sp in data_CFG:
+                            samplers['samplers'].append(sp)
+                            samplers['samplers'].append(sp)
+                            samplers['samplers'].append(sp)
+                            samplers['group'].append('min')
+                            samplers['group'].append('mean')
+                            samplers['group'].append('max')
+                            samplers['CFG'].append(pd.Series(data_CFG[sp]).min())
+                            samplers['CFG'].append(pd.Series(data_CFG[sp]).mean())
+                            samplers['CFG'].append(pd.Series(data_CFG[sp]).max())
+                        
+                        samplers = pd.DataFrame(
+                            samplers,
+                            columns=['samplers', 'group', 'CFG'],
+                
+                        )
+
+                        data = alt.Chart(samplers).mark_bar().encode(
+                            x="samplers:N",
+                            y="CFG:Q",
+                            xOffset="group:N",
+                            color='group:N',
+                        )
+                        st.altair_chart(
+                            data, 
+                            use_container_width=True,
+                            theme="streamlit"
+                        )
+
+                    st.subheader("Images", divider="blue")
+
                     col_1, col_2, col_3, col_4 = st.columns(4)
                     i = 1
                     for img in model[version['id']]['items']:
