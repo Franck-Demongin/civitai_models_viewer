@@ -249,7 +249,7 @@ if model_name:
 
             m_1, m_2, m_3, m_4 = st.columns(4)
 
-            m_1.metric(label="📥 Download", value=model['stats'].get('downloadCount'))
+            m_1.metric(label="📥 Download", value=model['stats'].get('downloadCount'), delta='')
             m_2.metric(label="👍 Likes", value=model['stats'].get('thumbsUpCount'))
             m_3.metric(label="👎 Unlikes", value=model['stats'].get('thumbsDownCount'))
             m_4.metric(label="💬 Comments", value=model['stats'].get('commentCount'))
@@ -268,16 +268,19 @@ if model_name:
                     st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {len(model[version['id']]['items'])}", unsafe_allow_html=True)
 
                     st.subheader("Stats", divider="blue")
-                    data_sampler = get_data_sampler(model[version['id']])
-                    data = alt.Chart(data_sampler).mark_arc().encode(
-                        theta="count",              
-                        color="sampler",
-                        tooltip=["sampler", "count"],
-                    )
-                    st.altair_chart(
-                        data, 
-                        use_container_width=False
-                    )
+                    
+                    _, col_2, _ = st.columns(3)
+                    with col_2:
+                        data_sampler = get_data_sampler(model[version['id']])
+                        data = alt.Chart(data_sampler).mark_arc().encode(
+                            theta="count",              
+                            color="sampler",
+                            tooltip=["sampler", "count"],
+                        )
+                        st.altair_chart(
+                            data, 
+                            use_container_width=False
+                        )
                     col_1, col_2 = st.columns(2)
                     with col_1:
                         data_steps = get_data_steps(model[version['id']])
@@ -349,7 +352,7 @@ if model_name:
                             theme="streamlit"
                         )
 
-                    st.subheader("Images", divider="blue")
+                    st.subheader(f"Images / {len(model[version['id']]['items'])}", divider="blue")
 
                     col_1, col_2, col_3, col_4 = st.columns(4)
                     i = 1
