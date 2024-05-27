@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import pandas as pd
 import requests
@@ -62,6 +63,8 @@ def popover_image_metadata(image: dict, version_id: int) -> None:
         sampler = meta.get('sampler', 'Not provided')
         clip_skip = meta.get('Clip skip', 'Not provided')
 
+        prompt = prompt.replace('<', '&lt;')
+        prompt = prompt.replace('>', '&gt;')
     msg = \
 """<p>ID: {id}<br>  
 Author: {author}<br>
