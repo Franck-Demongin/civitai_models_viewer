@@ -18,7 +18,7 @@ PAGE_TITLE = "Civitai Model Extractor"
 PAGE_ICON = "🚀"
 API_URL = 'https://civitai.com/api/v1/'
 
-VERSION = 'v0.1.0'
+VERSION = 'v0.1.1'
 
 def get_models_infos(model_name: str) -> dict:
     '''get models infos from civitai'''
@@ -52,7 +52,7 @@ st.set_page_config(
 
 def popover_image_metadata(image: dict, version_id: int) -> None:
     '''popup image metadata'''
-    model, prompt, negative_prompt, seed, steps, cfg_scale, sampler, clip_skip = None, None, None, None, None, None, None, None
+    model, prompt, prompt_html, negative_prompt, negative_prompt_html, seed, steps, cfg_scale, sampler, clip_skip = [None] * 10
     if meta:= image.get('meta'):
         model = meta.get('Model', 'Not provided')
         prompt = meta.get('prompt', 'Not provided')
@@ -63,16 +63,18 @@ def popover_image_metadata(image: dict, version_id: int) -> None:
         sampler = meta.get('sampler', 'Not provided')
         clip_skip = meta.get('Clip skip', 'Not provided')
 
-        prompt = prompt.replace('<', '&lt;')
-        prompt = prompt.replace('>', '&gt;')
+        prompt_html = prompt.replace('<', '&lt;')
+        prompt_html = prompt_html.replace('>', '&gt;')
+        negative_prompt_html = negative_prompt.replace('<', '&lt;')
+        negative_prompt_html = negative_prompt_html.replace('>', '&gt;')
     msg = \
 """<p>ID: {id}<br>  
 Author: {author}<br>
 Size: {size}<br>  
 Model: {model}</p>"""
 
-    msg_prompt = f"<p><b>Prompt:</b><br>{prompt}</p>"
-    msg_negative = f"<p><b>Negative Prompt:</b><br>{negative_prompt}</p>"
+    msg_prompt = f"<p><b>Prompt:</b><br>{prompt_html}</p>"
+    msg_negative = f"<p><b>Negative Prompt:</b><br>{negative_prompt_html}</p>"
 
     msg_extra = \
 """<p>
