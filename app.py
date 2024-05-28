@@ -27,10 +27,13 @@ def get_models_infos(model_name: str) -> dict:
         "Content-Type": "application/json",
         "Authorization": f"Bearer {CIVITAI_TOKEN}"
     }
-    response = requests.get(f"{API_URL}models?query={model}", headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    return data
+    try:
+        response = requests.get(f"{API_URL}models?query={model}", headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data
+    except requests.exceptions.RequestException as e:
+        st.error(e)
 
 def get_images(version_id: int, model_id: int) -> list:
     '''get images from version id model'''
@@ -38,11 +41,14 @@ def get_images(version_id: int, model_id: int) -> list:
         "Content-Type": "application/json",
         "Authorization": f"Bearer {CIVITAI_TOKEN}"
     }
-    response = requests.get(f"{API_URL}images?limit=200&modelVersionId={version_id}&modelId={model_id}", headers=headers)
-    # response = requests.get(f"https://civitai.com/api/v1/images?modelVersionId={version_id}", headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    return data
+    try:
+        response = requests.get(f"{API_URL}images?limit=200&modelVersionId={version_id}&modelId={model_id}", headers=headers)
+        # response = requests.get(f"https://civitai.com/api/v1/images?modelVersionId={version_id}", headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data
+    except requests.exceptions.RequestException as e:
+        st.error(e)
 
 st.set_page_config(
     page_title=PAGE_TITLE, 
@@ -269,194 +275,202 @@ if model_name:
                     st.session_state['models'][st.session_state['model_name']] = models
                 
 
-                with st.expander(f"{version['name']}", ):                
-                    st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {len(model[version['id']]['items'])}", unsafe_allow_html=True)
+                with st.expander(f"{version['name']}", ):    
+                    nb_images = 0
+                    if model[version['id']]:
+                        nb_images = len(model[version['id']]['items'])
+                    st.markdown(f"Download: [{version['id']}]({version['downloadUrl']})<br>Images: {nb_images}", unsafe_allow_html=True)
 
                     st.subheader("Stats", divider="blue")
                     
-                    _, col_2, _ = st.columns(3)
-                    with col_2:
-                        data_sampler = get_data_sampler(model[version['id']])
-                        data = alt.Chart(data_sampler).mark_arc().encode(
-                            theta="count",              
-                            color="sampler",
-                            tooltip=["sampler", "count"],
-                        )
-                        st.altair_chart(
-                            data, 
-                            use_container_width=False
-                        )
-                    col_1, col_2 = st.columns(2)
-                    with col_1:
-                        data_steps = get_data_steps(model[version['id']])
-                        samplers = {
-                            'samplers': [],
-                            'group': [],
-                            'steps': [],
-                        }
-                        for sp in data_steps:
-                            samplers['samplers'].append(sp)
-                            samplers['samplers'].append(sp)
-                            samplers['samplers'].append(sp)
-                            samplers['group'].append('min')
-                            samplers['group'].append('mean')
-                            samplers['group'].append('max')
-                            samplers['steps'].append(pd.Series(data_steps[sp]).min())
-                            samplers['steps'].append(pd.Series(data_steps[sp]).mean())
-                            samplers['steps'].append(pd.Series(data_steps[sp]).max())
-                        
-                        samplers = pd.DataFrame(
-                            samplers,
-                            columns=['samplers', 'group', 'steps']                
-                        )
-
-                        data = alt.Chart(samplers).mark_bar().encode(
-                            x="samplers:N",
-                            y="steps:Q",
-                            xOffset="group:N",
-                            color='group:N',
-                        )
-                        st.altair_chart(
-                            data, 
-                            use_container_width=True,
-                            theme="streamlit"
-                        )
-                    with col_2:
-                        data_CFG = get_data_CFG(model[version['id']])
-                        samplers = {
-                            'samplers': [],
-                            'group': [],
-                            'CFG': [],
-                        }
-                        for sp in data_CFG:
-                            samplers['samplers'].append(sp)
-                            samplers['samplers'].append(sp)
-                            samplers['samplers'].append(sp)
-                            samplers['group'].append('min')
-                            samplers['group'].append('mean')
-                            samplers['group'].append('max')
-                            samplers['CFG'].append(pd.Series(data_CFG[sp]).min())
-                            samplers['CFG'].append(pd.Series(data_CFG[sp]).mean())
-                            samplers['CFG'].append(pd.Series(data_CFG[sp]).max())
-                        
-                        samplers = pd.DataFrame(
-                            samplers,
-                            columns=['samplers', 'group', 'CFG'],
-                
-                        )
-
-                        data = alt.Chart(samplers).mark_bar().encode(
-                            x="samplers:N",
-                            y="CFG:Q",
-                            xOffset="group:N",
-                            color='group:N',
-                        )
-                        st.altair_chart(
-                            data, 
-                            use_container_width=True,
-                            theme="streamlit"
-                        )
-
-                    st.subheader(f"Images / {len(model[version['id']]['items'])}", divider="blue")
-
-                    col_1, col_2, col_3, col_4 = st.columns(4)
-                    i = 1
-                    for img in model[version['id']]['items']:
-                        if i == 1:
-                            col_1.image(img['url'])
-                            c_1, c_2, c_3 = col_1.columns(3, gap='small')
-                            with c_1.popover("ℹ️", use_container_width=True):
-                                popover_image_metadata(image=img, version_id=version['id'])
-                            data = ''
-                            disabled = True
-                            if meta:= img.get('meta'):
-                                if comfy:= meta.get('comfy'):
-                                    data_json = json.loads(comfy)
-                                    data = json.dumps(data_json.get('workflow'), indent=4)
-                                    disabled = False
-                                    
-                            c_2.download_button(
-                                label="WF",
-                                data = data,
-                                mime="text/json",
-                                key=f"nodes_{img['id']}_{version['id']}", 
-                                file_name=f"wf_{img['id']}.json",
-                                use_container_width=True,
-                                disabled=disabled
+                    if model[version['id']]:
+                        _, col_2, _ = st.columns(3)
+                        with col_2:
+                            data_sampler = get_data_sampler(model[version['id']])
+                            data = alt.Chart(data_sampler).mark_arc().encode(
+                                theta="count",              
+                                color="sampler",
+                                tooltip=["sampler", "count"],
                             )
-                            c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
-                        if i == 2:
-                            col_2.image(img['url'])
-                            c_1, c_2, c_3 = col_2.columns(3, gap='small')
-                            with c_1.popover("ℹ️", use_container_width=True):
-                                popover_image_metadata(image=img, version_id=version['id'])
-                            data = ''
-                            disabled = True
-                            if meta:= img.get('meta'):
-                                if comfy:= meta.get('comfy'):
-                                    data_json = json.loads(comfy)
-                                    data = json.dumps(data_json.get('workflow'), indent=4)
-                                    disabled = False
-                                    
-                            c_2.download_button(
-                                label="WF",
-                                data = data,
-                                mime="text/json",
-                                key=f"nodes_{img['id']}_{version['id']}", 
-                                file_name=f"wf_{img['id']}.json",
-                                use_container_width=True,
-                                disabled=disabled
+                            st.altair_chart(
+                                data, 
+                                use_container_width=False
                             )
-                            c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
-                        if i == 3:
-                            col_3.image(img['url'])
-                            c_1, c_2, c_3 = col_3.columns(3, gap='small')
-                            with c_1.popover("ℹ️", use_container_width=True):
-                                popover_image_metadata(image=img, version_id=version['id'])
-                            data = ''
-                            disabled = True
-                            if meta:= img.get('meta'):
-                                if comfy:= meta.get('comfy'):
-                                    data_json = json.loads(comfy)
-                                    data = json.dumps(data_json.get('workflow'), indent=4)
-                                    disabled = False
-                                    
-                            c_2.download_button(
-                                label="WF",
-                                data = data,
-                                mime="text/json",
-                                key=f"nodes_{img['id']}_{version['id']}", 
-                                file_name=f"wf_{img['id']}.json",
-                                use_container_width=True,
-                                disabled=disabled
+                        col_1, col_2 = st.columns(2)
+                        with col_1:
+                            data_steps = get_data_steps(model[version['id']])
+                            samplers = {
+                                'samplers': [],
+                                'group': [],
+                                'steps': [],
+                            }
+                            for sp in data_steps:
+                                samplers['samplers'].append(sp)
+                                samplers['samplers'].append(sp)
+                                samplers['samplers'].append(sp)
+                                samplers['group'].append('min')
+                                samplers['group'].append('mean')
+                                samplers['group'].append('max')
+                                samplers['steps'].append(pd.Series(data_steps[sp]).min())
+                                samplers['steps'].append(pd.Series(data_steps[sp]).mean())
+                                samplers['steps'].append(pd.Series(data_steps[sp]).max())
+                            
+                            samplers = pd.DataFrame(
+                                samplers,
+                                columns=['samplers', 'group', 'steps']                
                             )
-                            c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
-                        if i == 4:
-                            col_4.image(img['url'])
-                            c_1, c_2, c_3 = col_4.columns(3, gap='small')
-                            with c_1.popover("ℹ️", use_container_width=True):
-                                popover_image_metadata(image=img, version_id=version['id'])
-                            data = ''
-                            disabled = True
-                            if meta:= img.get('meta'):
-                                if comfy:= meta.get('comfy'):
-                                    data_json = json.loads(comfy)
-                                    data = json.dumps(data_json.get('workflow'), indent=4)
-                                    disabled = False
-                                    
-                            c_2.download_button(
-                                label="WF",
-                                data = data,
-                                mime="text/json",
-                                key=f"nodes_{img['id']}_{version['id']}", 
-                                file_name=f"wf_{img['id']}.json",
-                                use_container_width=True,
-                                disabled=disabled
+
+                            data = alt.Chart(samplers).mark_bar().encode(
+                                x="samplers:N",
+                                y="steps:Q",
+                                xOffset="group:N",
+                                color='group:N',
                             )
-                            c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
-                        i += 1
-                        if i > 4:
-                            i = 1
+                            st.altair_chart(
+                                data, 
+                                use_container_width=True,
+                                theme="streamlit"
+                            )
+                        with col_2:
+                            data_CFG = get_data_CFG(model[version['id']])
+                            samplers = {
+                                'samplers': [],
+                                'group': [],
+                                'CFG': [],
+                            }
+                            for sp in data_CFG:
+                                samplers['samplers'].append(sp)
+                                samplers['samplers'].append(sp)
+                                samplers['samplers'].append(sp)
+                                samplers['group'].append('min')
+                                samplers['group'].append('mean')
+                                samplers['group'].append('max')
+                                samplers['CFG'].append(pd.Series(data_CFG[sp]).min())
+                                samplers['CFG'].append(pd.Series(data_CFG[sp]).mean())
+                                samplers['CFG'].append(pd.Series(data_CFG[sp]).max())
+                            
+                            samplers = pd.DataFrame(
+                                samplers,
+                                columns=['samplers', 'group', 'CFG'],
+                    
+                            )
+
+                            data = alt.Chart(samplers).mark_bar().encode(
+                                x="samplers:N",
+                                y="CFG:Q",
+                                xOffset="group:N",
+                                color='group:N',
+                            )
+                            st.altair_chart(
+                                data, 
+                                use_container_width=True,
+                                theme="streamlit"
+                            )
+
+                        st.subheader(f"Images / {len(model[version['id']]['items'])}", divider="blue")
+
+                        col_1, col_2, col_3, col_4 = st.columns(4)
+                        i = 1
+                        for img in model[version['id']]['items']:
+                            if i == 1:
+                                col_1.image(img['url'])
+                                c_1, c_2, c_3 = col_1.columns(3, gap='small')
+                                with c_1.popover("ℹ️", use_container_width=True):
+                                    popover_image_metadata(image=img, version_id=version['id'])
+                                data = ''
+                                disabled = True
+                                if meta:= img.get('meta'):
+                                    if comfy:= meta.get('comfy'):
+                                        if isinstance(comfy, str):
+                                            data_json = json.loads(comfy)
+                                        data = json.dumps(data_json.get('workflow'), indent=4)
+                                        disabled = False
+                                        
+                                c_2.download_button(
+                                    label="WF",
+                                    data = data,
+                                    mime="text/json",
+                                    key=f"nodes_{img['id']}_{version['id']}", 
+                                    file_name=f"wf_{img['id']}.json",
+                                    use_container_width=True,
+                                    disabled=disabled
+                                )
+                                c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
+                            if i == 2:
+                                col_2.image(img['url'])
+                                c_1, c_2, c_3 = col_2.columns(3, gap='small')
+                                with c_1.popover("ℹ️", use_container_width=True):
+                                    popover_image_metadata(image=img, version_id=version['id'])
+                                data = ''
+                                disabled = True
+                                if meta:= img.get('meta'):
+                                    if comfy:= meta.get('comfy'):
+                                        if isinstance(comfy, str):
+                                            data_json = json.loads(comfy)
+                                        data = json.dumps(data_json.get('workflow'), indent=4)
+                                        disabled = False
+                                        
+                                c_2.download_button(
+                                    label="WF",
+                                    data = data,
+                                    mime="text/json",
+                                    key=f"nodes_{img['id']}_{version['id']}", 
+                                    file_name=f"wf_{img['id']}.json",
+                                    use_container_width=True,
+                                    disabled=disabled
+                                )
+                                c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
+                            if i == 3:
+                                col_3.image(img['url'])
+                                c_1, c_2, c_3 = col_3.columns(3, gap='small')
+                                with c_1.popover("ℹ️", use_container_width=True):
+                                    popover_image_metadata(image=img, version_id=version['id'])
+                                data = ''
+                                disabled = True
+                                if meta:= img.get('meta'):
+                                    if comfy:= meta.get('comfy'):
+                                        if isinstance(comfy, str):
+                                            data_json = json.loads(comfy)
+                                        data = json.dumps(data_json.get('workflow'), indent=4)
+                                        disabled = False
+                                        
+                                c_2.download_button(
+                                    label="WF",
+                                    data = data,
+                                    mime="text/json",
+                                    key=f"nodes_{img['id']}_{version['id']}", 
+                                    file_name=f"wf_{img['id']}.json",
+                                    use_container_width=True,
+                                    disabled=disabled
+                                )
+                                c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
+                            if i == 4:
+                                col_4.image(img['url'])
+                                c_1, c_2, c_3 = col_4.columns(3, gap='small')
+                                with c_1.popover("ℹ️", use_container_width=True):
+                                    popover_image_metadata(image=img, version_id=version['id'])
+                                data = ''
+                                disabled = True
+                                if meta:= img.get('meta'):
+                                    if comfy:= meta.get('comfy'):
+                                        if isinstance(comfy, str):
+                                            data_json = json.loads(comfy)
+                                        data = json.dumps(data_json.get('workflow'), indent=4)
+                                        disabled = False
+                                        
+                                c_2.download_button(
+                                    label="WF",
+                                    data = data,
+                                    mime="text/json",
+                                    key=f"nodes_{img['id']}_{version['id']}", 
+                                    file_name=f"wf_{img['id']}.json",
+                                    use_container_width=True,
+                                    disabled=disabled
+                                )
+                                c_3.link_button("📷", f"https://civitai.com/images/{img['id']}", use_container_width=True)
+                            i += 1
+                            if i > 4:
+                                i = 1
             with st.expander("Description"):
                 st.markdown(model['description'], unsafe_allow_html=True)
 
