@@ -213,7 +213,7 @@ div[data-testid="stPopoverBody"] {
 with st.sidebar:
     st.header(f"{PAGE_TITLE} {PAGE_ICON}")
     st.subheader(f"Version: {VERSION}")
-    model_name = st.text_input("Model Name", st.session_state['model_name'])
+    model_name = st.text_input("Model Name", key="input_model_name")
 
 if model_name:
     st.session_state['model_name'] = model_name
